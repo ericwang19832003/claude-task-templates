@@ -1,0 +1,3 @@
+# Local working state from dogfooding the script in this repo
+.claude-task/*
+!.claude-task/README.md

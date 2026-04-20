@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<EOF
+Usage: claude-task-init <slug> --title "<title>" [--owner <name>] [--parent <slug>]
+
+Scaffolds .claude-task/<slug>/ in the current directory using templates from
+\$CLAUDE_TASK_TEMPLATES (default: ~/claude-task-templates).
+
+If .claude-task/ does not exist yet, also drops README.md and updates .gitignore.
+Sets .claude-task/ACTIVE to <slug>.
+EOF
+  exit 1
+}
+
+[ $# -ge 1 ] || usage
+SLUG="$1"; shift
+TITLE=""; OWNER="${USER:-unassigned}"; PARENT="null"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --title)  TITLE="$2"; shift 2;;
+    --owner)  OWNER="$2"; shift 2;;
+    --parent) PARENT="$2"; shift 2;;
+    -h|--help) usage;;
+    *) echo "Unknown arg: $1"; usage;;
+  esac
+done
+[ -n "$TITLE" ] || { echo "Error: --title is required"; usage; }
+
+# slug sanity: lowercase, digits, hyphens only; non-empty
+case "$SLUG" in
+  *[!a-z0-9-]*|"") echo "Error: slug must be lowercase-kebab (a-z, 0-9, -)"; exit 2;;
+esac
+
+TEMPL="${CLAUDE_TASK_TEMPLATES:-$HOME/claude-task-templates}"
+[ -d "$TEMPL/templates/task" ] || { echo "Error: templates not found at $TEMPL/templates/task"; exit 3; }
+
+DIR=".claude-task"
+TASK_DIR="$DIR/$SLUG"
+[ -e "$TASK_DIR" ] && { echo "Error: $TASK_DIR already exists"; exit 4; }
+
+NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+DATE="$(date -u +%Y-%m-%d)"
+TIME="$(date -u +%H:%M)"
+
+# Bootstrap .claude-task/ if missing
+if [ ! -d "$DIR" ]; then
+  mkdir -p "$DIR"
+  cp "$TEMPL/templates/README.md.tmpl" "$DIR/README.md"
+  if [ -f .gitignore ]; then
+    if ! grep -qxF '.claude-task/*' .gitignore; then
+      printf '\n%s' "$(cat "$TEMPL/snippets/gitignore.snippet")" >> .gitignore
+    fi
+  else
+    cp "$TEMPL/snippets/gitignore.snippet" .gitignore
+  fi
+fi
+
+# Render task folder
+mkdir -p "$TASK_DIR"
+for f in STATUS.md BRIEF.md NEXT.md DECISIONS.md LOG.md ARTIFACTS.md; do
+  sed \
+    -e "s|{slug}|$SLUG|g" \
+    -e "s|{title}|$TITLE|g" \
+    -e "s|{owner}|$OWNER|g" \
+    -e "s|{parent_task}|$PARENT|g" \
+    -e "s|{YYYY-MM-DDTHH:MM:SSZ}|$NOW|g" \
+    -e "s|{YYYY-MM-DD HH:MM}|$DATE $TIME|g" \
+    -e "s|{YYYY-MM-DD}|$DATE|g" \
+    "$TEMPL/templates/task/$f.tmpl" > "$TASK_DIR/$f"
+done
+
+# Set ACTIVE pointer
+echo "$SLUG" > "$DIR/ACTIVE"
+
+cat <<EOF
+Created $TASK_DIR/ and set $DIR/ACTIVE -> $SLUG
+
+Next:
+  1. Fill $TASK_DIR/BRIEF.md (write-once: goal, scope, success criteria).
+  2. Edit $TASK_DIR/NEXT.md with your first concrete action.
+  3. When you start working, set 'status: in_progress' in $TASK_DIR/STATUS.md.
+EOF

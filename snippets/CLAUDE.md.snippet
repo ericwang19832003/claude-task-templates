@@ -1,0 +1,9 @@
+
+## Working memory protocol
+
+This repo uses `.claude-task/` for cross-session task memory. Before working:
+
+1. Read `.claude-task/README.md` for the protocol.
+2. `cat .claude-task/ACTIVE` to find the active task; if non-empty, do a takeover
+   (read STATUS.md → BRIEF.md → NEXT.md → skim DECISIONS.md, ~5 min).
+3. Checkpoint (rewrite STATUS+NEXT, append to LOG) before context bloat or session end.

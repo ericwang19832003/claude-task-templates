@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>claude-task-templates — Guide</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  :root {
+    --ink-900:#0b1220; --ink-700:#1f2937; --ink-500:#4b5563;
+    --ink-300:#9ca3af; --ink-150:#e5e7eb; --ink-50:#f8fafc;
+    --accent:#b3502f; --accent-soft:#fdeee6; --accent-ink:#7a3318;
+  }
+  html, body { margin: 0; color: var(--ink-900); background: #fff;
+    font: 11pt/1.55 -apple-system, "Segoe UI", Inter, sans-serif;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  h1 { font-size: 22pt; letter-spacing: -0.01em; margin: 0 0 4pt; }
+  h2 { font-size: 14pt; margin: 22pt 0 6pt; padding-bottom: 4pt;
+    border-bottom: 1px solid var(--ink-150); }
+  h3 { font-size: 12pt; margin: 14pt 0 4pt; color: var(--ink-700); }
+  h4 { font-size: 11pt; margin: 10pt 0 2pt; color: var(--ink-500);
+    text-transform: uppercase; letter-spacing: 0.05em; }
+  p, ul, ol { margin: 6pt 0; }
+  ul, ol { padding-left: 20pt; }
+  li { margin: 2pt 0; }
+  code { font-family: "Cascadia Code", Consolas, "JetBrains Mono", monospace;
+    font-size: 9.5pt; background: var(--ink-50); padding: 1pt 4pt;
+    border-radius: 3pt; }
+  pre { background: var(--ink-900); color: #e5e7eb;
+    padding: 10pt 12pt; border-radius: 4pt; overflow-x: auto;
+    font: 9pt/1.45 "Cascadia Code", Consolas, "JetBrains Mono", monospace;
+    page-break-inside: avoid; }
+  pre code { background: transparent; color: inherit; padding: 0;
+    font-size: inherit; }
+  table { width: 100%; border-collapse: collapse; margin: 8pt 0;
+    page-break-inside: avoid; }
+  th, td { text-align: left; padding: 6pt 8pt;
+    border-bottom: 1px solid var(--ink-150); vertical-align: top; }
+  th { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--ink-500); border-bottom: 1.5px solid var(--ink-300); }
+  .lede { color: var(--ink-500); font-size: 11pt; margin: 0 0 16pt; }
+  .pill { display: inline-block; padding: 1pt 6pt; border-radius: 3pt;
+    background: var(--accent-soft); color: var(--accent-ink);
+    font-size: 8pt; font-weight: 600; letter-spacing: 0.04em;
+    text-transform: uppercase; vertical-align: middle; }
+  .callout { background: var(--ink-50); border-left: 3pt solid var(--accent);
+    padding: 8pt 12pt; margin: 8pt 0; page-break-inside: avoid; }
+  .toc { background: var(--ink-50); padding: 10pt 14pt; border-radius: 4pt;
+    margin: 12pt 0 18pt; }
+  .toc ol { margin: 4pt 0 0; padding-left: 18pt; }
+  .toc li { margin: 1pt 0; }
+  .meta { color: var(--ink-500); font-size: 9.5pt; margin-bottom: 8pt; }
+  .filetree { font: 9.5pt/1.45 "Cascadia Code", Consolas, "JetBrains Mono", monospace;
+    background: var(--ink-50); padding: 10pt 14pt; border-radius: 4pt;
+    white-space: pre; page-break-inside: avoid; }
+  .nowrap { white-space: nowrap; }
+  hr { border: none; border-top: 1px solid var(--ink-150); margin: 18pt 0; }
+  a { color: var(--accent-ink); text-decoration: none; word-break: break-all; }
+  .pagebreak { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<h1>claude-task-templates</h1>
+<p class="lede">A repo-local memory layer for long-running Claude Code sessions and multi-session orchestration.</p>
+<div class="meta">
+  Version 1 · 2026-04-20 ·
+  <a href="https://github.com/ericwang19832003/claude-task-templates">github.com/ericwang19832003/claude-task-templates</a>
+</div>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li>What this is and why it exists</li>
+    <li>The five goals</li>
+    <li>How it fits with existing Claude Code memory</li>
+    <li>What was implemented</li>
+    <li>Install</li>
+    <li>Daily use — five commands you actually run</li>
+    <li>The six task files in detail</li>
+    <li>The lifecycle — init, checkpoint, takeover, fold, archive</li>
+    <li>The orchestrator API</li>
+    <li>Anti-patterns to avoid</li>
+    <li>Example: the live Foundation task</li>
+    <li>Where things live (file map)</li>
+  </ol>
+</div>
+
+<h2>1. What this is and why it exists</h2>
+<p>Claude Code conversations end. Sometimes deliberately (the user runs <code>/clear</code> or starts a fresh session), sometimes because context grows too large to be useful. When a session ends mid-work, the next agent — possibly a different model, possibly on a different machine — usually has to reconstruct what was happening, re-litigate decisions, and re-learn the constraints. That's expensive and error-prone.</p>
+<p>This system is a small set of Markdown templates plus a shell script that creates a per-task working memory folder inside any repo. An arriving agent reads three files (Status, Brief, Next) and is up to speed in roughly five minutes. Old context can be safely thrown away because the important state lives on disk.</p>
+
+<h2>2. The five goals</h2>
+<ol>
+  <li>A session can be reset (or <code>/clear</code>-ed) at any time without losing important state.</li>
+  <li>Context doesn't grow unboundedly and degrade model performance.</li>
+  <li>A brand-new agent can take over a task within <strong>five minutes</strong> by reading the memory files.</li>
+  <li>An orchestrator (script, scheduled trigger, dashboard) can read task status programmatically.</li>
+  <li>Repeated work and back-and-forth on the same problem across sessions is reduced.</li>
+</ol>
+
+<h2>3. How it fits with existing Claude Code memory</h2>
+<p>Three coexisting layers, each with a different timescale:</p>
+<table>
+  <thead><tr><th>Layer</th><th>Where</th><th>Lifetime</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>Auto-memory <span class="pill">existing</span></td><td><code>~/.claude/projects/.../memory/</code></td><td>Months to years</td><td>User profile, feedback rules, project background, references.</td></tr>
+    <tr><td>Task memory <span class="pill">this</span></td><td><code>&lt;repo&gt;/.claude-task/&lt;slug&gt;/</code></td><td>Hours to weeks</td><td>Cross-session handoff: decisions, log, artifacts.</td></tr>
+    <tr><td>Harness tasks <span class="pill">existing</span></td><td><code>~/.claude/tasks/&lt;session&gt;/&lt;id&gt;.json</code></td><td>One session</td><td>Within-session step tracking via <code>TaskCreate</code> / <code>TaskUpdate</code>.</td></tr>
+  </tbody>
+</table>
+<p>This system only addresses the middle layer. The other two stay as-is and are not replaced.</p>
+
+<h2>4. What was implemented</h2>
+<p>One new public GitHub repo and one update to AdhocPrintStudio.</p>
+<h3>Repo: claude-task-templates (new)</h3>
+<div class="filetree">claude-task-templates/
+  bin/
+    claude-task-init             one shell script that scaffolds a task folder
+  templates/
+    README.md.tmpl               .claude-task/README.md (committed in target repo)
+    ACTIVE.tmpl                  one-line file naming the active task slug
+    task/
+      STATUS.md.tmpl
+      BRIEF.md.tmpl
+      NEXT.md.tmpl
+      DECISIONS.md.tmpl
+      LOG.md.tmpl
+      ARTIFACTS.md.tmpl
+  snippets/
+    CLAUDE.md.snippet            block to append to a target repo CLAUDE.md
+    gitignore.snippet            two-line gitignore pattern
+  docs/
+    specs/
+      2026-04-20-design.md       full design specification
+      2026-04-20-plan.md         implementation plan
+    guide.html                   this document, source of the PDF
+  README.md
+  LICENSE                        MIT</div>
+
+<h3>Repo: AdhocPrintStudio (updated)</h3>
+<p>The existing repo now opts in to the system. <code>.gitignore</code> gained the two-line pattern and <code>.claude-task/README.md</code> was committed (everything else under <code>.claude-task/</code> is local-only). The first real task folder, <code>.claude-task/ui-redesign-foundation/</code>, was populated with the actual state of the in-flight UI redesign Foundation work as a dogfood test.</p>
+
+<h2>5. Install</h2>
+<p>One-time, in Git Bash:</p>
+<pre><code>git clone https://github.com/ericwang19832003/claude-task-templates.git ~/claude-task-templates
+echo 'export PATH="$HOME/claude-task-templates/bin:$PATH"' &gt;&gt; ~/.bashrc
+exec $SHELL</code></pre>
+<p>On this machine the repo is already at <code>C:\Users\Eric\claude-task-templates\</code>, which is <code>~/claude-task-templates</code> from Git Bash — only the <code>PATH</code> export and shell reload are still needed.</p>
+<p>Verify the install:</p>
+<pre><code>which claude-task-init
+# expected: /c/Users/Eric/claude-task-templates/bin/claude-task-init</code></pre>
+
+<h2>6. Daily use — five commands you actually run</h2>
+<table>
+  <thead><tr><th>Goal</th><th>Command or action</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Start a new task</td>
+      <td><code>claude-task-init my-task --title "What I'm working on"</code></td>
+    </tr>
+    <tr>
+      <td>See the active task</td>
+      <td><code>cat .claude-task/ACTIVE</code></td>
+    </tr>
+    <tr>
+      <td>Take over an existing task (in a fresh session)</td>
+      <td>
+        <code>cd .claude-task/$(cat .claude-task/ACTIVE)/</code><br>
+        Then read <code>STATUS.md</code> → <code>BRIEF.md</code> → <code>NEXT.md</code>, skim <code>DECISIONS.md</code>.
+      </td>
+    </tr>
+    <tr>
+      <td>Checkpoint before a reset or natural pause</td>
+      <td>Edit <code>STATUS.md</code> (rewrite "Where we are", bump <code>updated</code>), overwrite <code>NEXT.md</code> with literal next 1–3 steps, append a <code>LOG.md</code> entry. ≤2 minutes.</td>
+    </tr>
+    <tr>
+      <td>Read every task's status programmatically</td>
+      <td>Python or <code>yq</code> snippet — see §9.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>The discipline that makes the rest work:</strong> checkpoint at every natural pause — finishing a phase, hitting a blocker, switching focus, before you sense context bloat. A two-minute checkpoint every hour beats a twenty-minute reconstruction after a <code>/clear</code>.
+</div>
+
+<h2>7. The six task files in detail</h2>
+<p>Every task folder contains exactly these six files. Predictable structure means an arriving agent never wonders whether a file exists.</p>
+<table>
+  <thead><tr><th>File</th><th>Job</th><th>Mutation</th><th>Read by takeover?</th></tr></thead>
+  <tbody>
+    <tr><td><code>STATUS.md</code></td><td>Snapshot of current state plus YAML frontmatter</td><td>Overwritten frequently</td><td>Yes (always)</td></tr>
+    <tr><td><code>BRIEF.md</code></td><td>Goal, scope, success criteria, constraints</td><td>Write-once at init</td><td>Yes (always)</td></tr>
+    <tr><td><code>NEXT.md</code></td><td>Concrete next 1–3 steps</td><td>Overwritten at every checkpoint</td><td>Yes (always)</td></tr>
+    <tr><td><code>DECISIONS.md</code></td><td>Irreversible choices with why-lines</td><td>Append-only, newest at top</td><td>Skim</td></tr>
+    <tr><td><code>LOG.md</code></td><td>Append-only journal of significant events</td><td>Append; fold when &gt;500 lines</td><td>Lazy / on demand</td></tr>
+    <tr><td><code>ARTIFACTS.md</code></td><td>Pointers to files, commits, PRs, URLs produced</td><td>Append-only</td><td>On demand</td></tr>
+  </tbody>
+</table>
+
+<h3>STATUS.md — the orchestrator contract</h3>
+<p>The YAML frontmatter is the contract that scripts read. Field reference:</p>
+<table>
+  <thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>task_id</code></td><td>string (slug)</td><td>Stable identity, never renamed.</td></tr>
+    <tr><td><code>title</code></td><td>string</td><td>One-line human title.</td></tr>
+    <tr><td><code>status</code></td><td>enum</td><td><code>not_started</code> · <code>in_progress</code> · <code>blocked</code> · <code>awaiting_review</code> · <code>done</code> · <code>abandoned</code></td></tr>
+    <tr><td><code>owner</code></td><td>string</td><td>Current owner (model name or human name) or <code>unassigned</code>.</td></tr>
+    <tr><td><code>session_id</code></td><td>UUID or null</td><td>Which Claude session is on it now.</td></tr>
+    <tr><td><code>created</code> / <code>updated</code></td><td>ISO 8601 UTC</td><td>Bump <code>updated</code> on every edit.</td></tr>
+    <tr><td><code>parent_task</code></td><td>slug or null</td><td>For sub-tasks of larger work.</td></tr>
+    <tr><td><code>blockers_open</code></td><td>integer</td><td>Quick dashboard signal.</td></tr>
+    <tr><td><code>next_action_owner</code></td><td><code>claude</code> · <code>human</code> · <code>unknown</code></td><td>Who needs to do the next thing.</td></tr>
+  </tbody>
+</table>
+
+<h2>8. The lifecycle — init, checkpoint, takeover, fold, archive</h2>
+
+<h3>Init — create a new task</h3>
+<p>Trigger: a piece of work expected to span more than one session, or that produces enough state to need handoff. <em>A typo fix doesn't need a folder.</em></p>
+<pre><code>claude-task-init &lt;slug&gt; --title "..." [--owner &lt;name&gt;] [--parent &lt;slug&gt;]</code></pre>
+<p>The script picks a slug, creates <code>.claude-task/&lt;slug&gt;/</code> with all six files, fills timestamps, sets <code>.claude-task/ACTIVE</code>, and (if needed) drops the <code>README.md</code> and updates <code>.gitignore</code>. Then by hand: fill <code>BRIEF.md</code>, write the first <code>NEXT.md</code>, set status to <code>in_progress</code>.</p>
+
+<h3>Checkpoint — before reset, /clear, or handoff</h3>
+<ol>
+  <li>Update <code>STATUS.md</code>: rewrite "Where we are" (≤80 words), bump <code>updated</code>, update <code>status</code> if changed, update <code>blockers_open</code>, paste last 3 LOG entries into "Recent log excerpt".</li>
+  <li>Overwrite <code>NEXT.md</code> with the literal next 1–3 things. Be specific: file paths, commands, hashes, URLs.</li>
+  <li>Append a <code>LOG.md</code> entry summarising what happened since the last checkpoint.</li>
+  <li>If a new irreversible choice was made, append to <code>DECISIONS.md</code>.</li>
+  <li>If a new artifact was produced (commit, PR, file, URL), append to <code>ARTIFACTS.md</code>.</li>
+  <li>If <code>LOG.md</code> exceeds 500 lines, run Fold.</li>
+</ol>
+
+<h3>Takeover — fresh agent picking up</h3>
+<p>Goal: working knowledge in five minutes.</p>
+<table>
+  <thead><tr><th>Step</th><th>Time</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>1 sec</td><td><code>cat .claude-task/ACTIVE</code></td></tr>
+    <tr><td>2</td><td>1 sec</td><td><code>cd .claude-task/$(cat .claude-task/ACTIVE)/</code></td></tr>
+    <tr><td>3</td><td>30 sec</td><td>Read <code>STATUS.md</code> — frontmatter + body.</td></tr>
+    <tr><td>4</td><td>1 min</td><td>Read <code>BRIEF.md</code> — goal, scope, success.</td></tr>
+    <tr><td>5</td><td>30 sec</td><td>Read <code>NEXT.md</code> — concrete next step.</td></tr>
+    <tr><td>6</td><td>2 min</td><td>Skim <code>DECISIONS.md</code> (newest 5–10 entries) so you don't re-litigate.</td></tr>
+    <tr><td>7</td><td>30 sec</td><td>Update <code>STATUS.md</code> frontmatter: new <code>owner</code>, new <code>session_id</code>, bump <code>updated</code>.</td></tr>
+    <tr><td>8</td><td>—</td><td>Optionally open <code>LOG.md</code> only if confused.</td></tr>
+    <tr><td>9</td><td>—</td><td>Mirror <code>NEXT.md</code> steps into harness <code>TaskCreate</code> calls and start.</td></tr>
+  </tbody>
+</table>
+<p><strong><code>LOG.md</code> is opt-in.</strong> That single design choice is what makes a five-minute takeover achievable.</p>
+
+<h3>Fold — compress LOG.md when over 500 lines</h3>
+<ol>
+  <li>Identify the 200 oldest entries (bottom of file).</li>
+  <li>Write a <code>## Summarized through &lt;date&gt;</code> block: 5–15 bullets, one per major arc, preserving commit hashes / PR numbers / key file paths.</li>
+  <li>Insert that block at the top of <code>LOG.md</code> (above the 300 most recent entries).</li>
+  <li>Delete the 200 original entries that were folded.</li>
+</ol>
+<p>A folded LOG never grows the summary block beyond about 30 lines — re-folds compress prior summaries with the new oldest 200. Bounded forever.</p>
+
+<h3>Archive — when status flips to done or abandoned</h3>
+<ol>
+  <li>Final checkpoint — last STATUS update, last LOG entry, success-criteria check-off.</li>
+  <li><code>mv .claude-task/&lt;slug&gt; .claude-task/_archive/&lt;slug&gt;</code></li>
+  <li>If <code>.claude-task/ACTIVE</code> pointed to <code>&lt;slug&gt;</code>, clear it or update it to the next task.</li>
+</ol>
+<p>Archived tasks are read-only — preserved for history, grep, and audit.</p>
+
+<h3>Where the protocols live so agents follow them</h3>
+<p>Append the snippet at <code>~/claude-task-templates/snippets/CLAUDE.md.snippet</code> to your repo's <code>CLAUDE.md</code>. Then every Claude Code session in that repo sees the protocol at startup and knows to look at <code>.claude-task/ACTIVE</code> first.</p>
+
+<h2>9. The orchestrator API</h2>
+
+<h3>Python — no dependencies beyond PyYAML</h3>
+<pre><code>import yaml, pathlib, re
+for f in pathlib.Path('.claude-task').glob('*/STATUS.md'):
+    text = f.read_text()
+    m = re.match(r'---\n(.*?)\n---', text, re.S)
+    if m:
+        fm = yaml.safe_load(m.group(1))
+        print(fm['task_id'], fm['status'], fm['owner'], fm['updated'])</code></pre>
+
+<h3>Bash plus yq</h3>
+<pre><code>for d in .claude-task/*/; do
+  [ -f "$d/STATUS.md" ] || continue
+  yq -f extract '"\(.task_id)\t\(.status)\t\(.owner)\t\(.updated)"' "$d/STATUS.md"
+done</code></pre>
+
+<h3>Use cases this enables</h3>
+<ul>
+  <li>A <code>/loop</code> watcher that pings the user when <code>next_action_owner</code> is <code>human</code> and <code>status</code> is <code>blocked</code>.</li>
+  <li>A scheduled cron trigger that summarises the day's task progress across many repos.</li>
+  <li>A simple terminal dashboard that lists open tasks across many repos by globbing <code>~/code/*/.claude-task/*/STATUS.md</code>.</li>
+  <li>A pre-<code>/clear</code> hook that refuses to clear if <code>ACTIVE</code> points at a task whose <code>STATUS</code> hasn't been updated in this session.</li>
+</ul>
+
+<h2>10. Anti-patterns to avoid</h2>
+<ul>
+  <li><strong>Writing to LOG.md without updating STATUS.md.</strong> The orchestrator polls a stale snapshot. Every meaningful LOG entry should bump the STATUS <code>updated</code> timestamp at minimum.</li>
+  <li><strong>Editing BRIEF.md after init.</strong> It's write-once. If scope genuinely changes, add a DECISIONS entry ("scope expanded to include X — why: …") and let BRIEF stand. This preserves the original intent for blame and audit.</li>
+  <li><strong>Skipping checkpoints to save time.</strong> That is exactly how context bloats and goal #2 fails.</li>
+  <li><strong>Creating a task folder for trivial one-shot work.</strong> Threshold: "expected to span more than one session, or produce non-trivial decisions worth preserving." A typo fix doesn't qualify.</li>
+  <li><strong>Multiple agents editing the same task simultaneously.</strong> No locking. Coordinate via <code>owner</code> and <code>session_id</code> in STATUS frontmatter.</li>
+  <li><strong>Storing secrets in any of these files.</strong> They're plaintext on disk; if you ever decide to commit, secrets leak.</li>
+  <li><strong>Letting auto-memory carry per-task state.</strong> Auto-memory is for slow-moving facts. Per-task working state belongs in <code>.claude-task/</code>.</li>
+</ul>
+
+<h2>11. Example: the live Foundation task</h2>
+<p>The first real use of the system was the in-flight UI redesign Foundation work in AdhocPrintStudio. The folder <code>.claude-task/ui-redesign-foundation/</code> was created with the init script, then populated by hand to capture the current state:</p>
+<ul>
+  <li><code>STATUS.md</code>: <code>status: awaiting_review</code>, owner flipped to human, frontmatter shows blockers_open: 0 and next_action_owner: human.</li>
+  <li><code>BRIEF.md</code>: goal, in/out-of-scope lists, success criteria, source-spec links to commits <code>f6b7642</code> (design) and <code>1f2ec8e</code> (plan).</li>
+  <li><code>NEXT.md</code>: literal command for plan Phase 0.1 — <code>npm install</code> the Radix and lucide packages — plus an "if blocked" fallback.</li>
+  <li><code>DECISIONS.md</code>: four entries explaining why this was decomposed as sub-project A, why Radix, why <code>apps/web/src/design/</code>, why the <code>--accent</code> rename.</li>
+  <li><code>ARTIFACTS.md</code>: design-spec commit, plan commit, v0.4.1 release URL, mockup HTML files.</li>
+  <li><code>LOG.md</code>: two entries, newest first.</li>
+</ul>
+<p>A new agent opening AdhocPrintStudio in a fresh session, told nothing else, can read those four short files and know exactly where the work stands and what to do next.</p>
+
+<h2>12. Where things live (file map)</h2>
+<table>
+  <thead><tr><th>What</th><th>Where</th></tr></thead>
+  <tbody>
+    <tr><td>Templates and init script</td><td><code>C:\Users\Eric\claude-task-templates\</code></td></tr>
+    <tr><td>Public mirror</td><td><a href="https://github.com/ericwang19832003/claude-task-templates">github.com/ericwang19832003/claude-task-templates</a></td></tr>
+    <tr><td>Design spec</td><td><code>docs/specs/2026-04-20-design.md</code> in that repo</td></tr>
+    <tr><td>Implementation plan</td><td><code>docs/specs/2026-04-20-plan.md</code> in that repo</td></tr>
+    <tr><td>Live example task folder</td><td><code>C:\AdhocPrintStudio-main\AdhocPrintStudio-main\.claude-task\ui-redesign-foundation\</code> (local-only)</td></tr>
+    <tr><td>Per-repo committed README</td><td><code>&lt;any-repo&gt;/.claude-task/README.md</code></td></tr>
+    <tr><td>Per-task local working memory</td><td><code>&lt;any-repo&gt;/.claude-task/&lt;slug&gt;/</code> (git-ignored)</td></tr>
+    <tr><td>Auto-memory (separate system)</td><td><code>~/.claude/projects/.../memory/</code></td></tr>
+    <tr><td>Harness per-session tasks (separate system)</td><td><code>~/.claude/tasks/&lt;session&gt;/&lt;id&gt;.json</code></td></tr>
+  </tbody>
+</table>
+
+<hr/>
+<p class="meta">End of document. Generated 2026-04-20 from <code>docs/guide.html</code> in the claude-task-templates repo.</p>
+
+</body>
+</html>

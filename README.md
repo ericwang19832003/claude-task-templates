@@ -65,6 +65,39 @@ Add this snippet to your repo's `CLAUDE.md` so every Claude Code session sees it
 cat ~/claude-task-templates/snippets/CLAUDE.md.snippet >> CLAUDE.md
 ```
 
+## Auto-checkpoint via SessionEnd hook (optional but recommended)
+
+The system relies on the agent (or you) calling `claude-task-checkpoint` at natural pauses. To guarantee at least one checkpoint per session, wire the included script into a Claude Code SessionEnd hook so it fires automatically when a session ends:
+
+Add to `~/.claude/settings.json` (merging with any existing settings):
+
+```json
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/claude-task-templates/bin/claude-task-checkpoint --source hook",
+            "shell": "bash",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The script is idempotent and silently no-ops in repos without a `.claude-task/` folder, so it's safe to fire on every session in every repo. When it does fire on a task repo, it bumps `STATUS.md` `updated`, appends a one-line auto-checkpoint entry to `LOG.md`, and warns to stderr if `NEXT.md` still has placeholder text.
+
+Run manually any time:
+
+```bash
+claude-task-checkpoint --reason "wrapping up phase 0"
+```
+
 ## Orchestrator API
 
 The YAML frontmatter in `<slug>/STATUS.md` is the contract. Read it from any language:

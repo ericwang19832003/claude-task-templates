@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# claude-task-checkpoint — auto-checkpoint hook for Claude Code
+#
+# Designed to be wired into a SessionEnd / Stop hook in ~/.claude/settings.json.
+# Also runnable manually: `claude-task-checkpoint [--reason "<text>"]`.
+#
+# What it does (only if .claude-task/ACTIVE points at an existing task):
+#   1. Bumps STATUS.md `updated` timestamp.
+#   2. Appends a one-line entry to LOG.md noting that the session ended.
+#   3. Warns to stderr if NEXT.md hasn't been touched since the previous checkpoint
+#      (a soft signal that the agent forgot to update it).
+#   4. Exits 0 silently if there is no active task or no .claude-task/ folder
+#      — so wiring this hook into a global settings.json never breaks repos
+#      that don't use the system.
+
+set -euo pipefail
+
+REASON="session ended"
+SOURCE="hook"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --reason) REASON="$2"; shift 2;;
+    --source) SOURCE="$2"; shift 2;;
+    -h|--help)
+      cat <<EOF
+Usage: claude-task-checkpoint [--reason "<text>"] [--source "<text>"]
+Auto-checkpoint the active task in the current repo's .claude-task/.
+Silent no-op if .claude-task/ACTIVE is missing or points at nothing.
+EOF
+      exit 0;;
+    *) echo "Unknown arg: $1" >&2; exit 2;;
+  esac
+done
+
+# Locate the repo's .claude-task/. Walk up from cwd until we find one or hit /.
+DIR="$(pwd)"
+while [ "$DIR" != "/" ] && [ "$DIR" != "" ]; do
+  if [ -d "$DIR/.claude-task" ]; then
+    break
+  fi
+  DIR="$(dirname "$DIR")"
+done
+[ -d "$DIR/.claude-task" ] || exit 0    # no .claude-task in scope — silent exit
+
+ACTIVE_FILE="$DIR/.claude-task/ACTIVE"
+[ -f "$ACTIVE_FILE" ] || exit 0
+SLUG="$(tr -d '[:space:]' < "$ACTIVE_FILE")"
+[ -n "$SLUG" ] || exit 0
+
+TASK_DIR="$DIR/.claude-task/$SLUG"
+[ -d "$TASK_DIR" ] || { echo "claude-task-checkpoint: ACTIVE points at missing task '$SLUG'" >&2; exit 0; }
+
+STATUS="$TASK_DIR/STATUS.md"
+LOG="$TASK_DIR/LOG.md"
+NEXT="$TASK_DIR/NEXT.md"
+[ -f "$STATUS" ] || exit 0    # malformed task folder — silent exit
+
+NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+DATE="$(date -u +%Y-%m-%d)"
+TIME="$(date -u +%H:%M)"
+
+# 1. Bump STATUS.md `updated` timestamp inside the YAML frontmatter.
+#    Only the first occurrence inside the leading --- block is replaced.
+python - "$STATUS" "$NOW" <<'PY'
+import sys, re, pathlib
+p = pathlib.Path(sys.argv[1]); now = sys.argv[2]
+text = p.read_text(encoding="utf-8")
+m = re.match(r"(---\n)(.*?)(\n---)", text, re.S)
+if not m:
+    sys.exit(0)
+fm = m.group(2)
+fm = re.sub(r"^updated:\s*.*$", f"updated: {now}", fm, count=1, flags=re.M)
+p.write_text(text[:m.start(2)] + fm + text[m.end(2):], encoding="utf-8")
+PY
+
+# 2. Append LOG entry. New entries go at the top (newest-first convention).
+TMP="$(mktemp)"
+{
+  head -n 4 "$LOG" 2>/dev/null
+  printf '\n## %s %s · auto-checkpoint (%s)\n\n' "$DATE" "$TIME" "$SOURCE"
+  printf '%s\n' "$REASON"
+  tail -n +5 "$LOG" 2>/dev/null
+} > "$TMP"
+mv "$TMP" "$LOG"
+
+# 3. Soft warning if NEXT.md still contains the placeholder body.
+if grep -q '_One concrete action' "$NEXT" 2>/dev/null; then
+  echo "claude-task-checkpoint: warning — $NEXT still has placeholder text. Update it before the next session." >&2
+fi
+
+# Hooks should print nothing to stdout unless they want it surfaced.
+exit 0

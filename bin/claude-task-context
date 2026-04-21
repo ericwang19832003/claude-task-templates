@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# claude-task-context — UserPromptSubmit hook for Claude Code.
+#
+# On every user prompt, emits a compact JSON `additionalContext` block summarising
+# the active task in the session's repo so Claude is always aware of cross-session
+# state. Silent no-op if there is no .claude-task/ in scope or no ACTIVE task.
+#
+# Hook output schema (Claude Code):
+#   {"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"..."}}
+#
+# Stdin (the prompt JSON) is read but ignored — task context is purely cwd-derived.
+
+set -euo pipefail
+
+# Drain stdin (hook contract — even though we don't use it).
+cat >/dev/null
+
+# Walk up from cwd until we find a .claude-task/ folder, or hit /.
+DIR="$(pwd)"
+while [ "$DIR" != "/" ] && [ "$DIR" != "" ]; do
+  [ -d "$DIR/.claude-task" ] && break
+  DIR="$(dirname "$DIR")"
+done
+[ -d "$DIR/.claude-task" ] || exit 0    # silent: no .claude-task in scope
+
+ACTIVE_FILE="$DIR/.claude-task/ACTIVE"
+[ -f "$ACTIVE_FILE" ] || exit 0
+SLUG="$(tr -d '[:space:]' < "$ACTIVE_FILE")"
+[ -n "$SLUG" ] || exit 0
+
+TASK_DIR="$DIR/.claude-task/$SLUG"
+[ -d "$TASK_DIR" ] || exit 0
+
+STATUS="$TASK_DIR/STATUS.md"
+NEXT="$TASK_DIR/NEXT.md"
+[ -f "$STATUS" ] || exit 0    # malformed task, silent exit
+
+# Build the injection via Python — handles JSON escaping + size cap robustly.
+python - "$STATUS" "$NEXT" "$SLUG" <<'PY'
+import sys, re, json, pathlib
+
+status_p = pathlib.Path(sys.argv[1])
+next_p   = pathlib.Path(sys.argv[2])
+slug     = sys.argv[3]
+
+status = status_p.read_text(encoding="utf-8")
+
+# Parse YAML frontmatter (manually — no PyYAML dep on every prompt).
+fm = {}
+m = re.match(r"---\n(.*?)\n---", status, re.S)
+if m:
+    for line in m.group(1).splitlines():
+        if ":" in line:
+            k, _, v = line.partition(":")
+            fm[k.strip()] = v.strip()
+body = status[m.end():] if m else status
+
+# Pull "Where we are" paragraph (between that heading and the next ## heading).
+def section(text, heading):
+    pat = re.compile(rf"##\s+{re.escape(heading)}\s*\n(.*?)(?:\n##\s|\Z)", re.S)
+    mm = pat.search(text)
+    return mm.group(1).strip() if mm else ""
+
+where    = section(body, "Where we are")
+log_excerpt = section(body, "Recent log excerpt")
+now      = ""
+if next_p.exists():
+    now = section(next_p.read_text(encoding="utf-8"), "Now")
+
+# Strip placeholder text so we don't inject noise on freshly-init'd tasks.
+def strip_placeholder(s):
+    if not s: return ""
+    if s.startswith("_") and s.rstrip().endswith("_"):
+        return ""
+    return s
+
+where = strip_placeholder(where)
+now   = strip_placeholder(now)
+
+# Compose. Keep under ~1500 chars (≈ 400 tokens) to bound per-prompt cost.
+def cap(s, n):
+    s = s.strip()
+    return s if len(s) <= n else s[:n - 3].rstrip() + "..."
+
+lines = [
+    "[claude-task-templates: active task context]",
+    f"Task: {slug} — {fm.get('title', '(untitled)')}",
+    f"Status: {fm.get('status', '?')} · Owner: {fm.get('owner', '?')} · "
+        f"Updated: {fm.get('updated', '?')}",
+    f"Next action owner: {fm.get('next_action_owner', '?')} · "
+        f"Blockers open: {fm.get('blockers_open', '?')}",
+]
+if where:
+    lines += ["", "Where we are:", cap(where, 600)]
+if now:
+    lines += ["", "Now (per NEXT.md):", cap(now, 600)]
+lines += [
+    "",
+    "Per ~/.claude/CLAUDE.md: if this is the first prompt this session, perform a "
+    "task takeover (read STATUS/BRIEF/NEXT/DECISIONS) before acting. Checkpoint "
+    "(update STATUS, NEXT, LOG) at every natural pause.",
+]
+ctx = "\n".join(lines)
+ctx = cap(ctx, 1500)
+
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "UserPromptSubmit",
+        "additionalContext": ctx,
+    }
+}))
+PY

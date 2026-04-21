@@ -98,6 +98,35 @@ Run manually any time:
 claude-task-checkpoint --reason "wrapping up phase 0"
 ```
 
+## Auto-context injection via UserPromptSubmit hook (recommended)
+
+For *fully* hands-free operation: a second hook (`UserPromptSubmit`) runs `claude-task-context` on every prompt. The script reads the active task's STATUS frontmatter, "Where we are" paragraph, and NEXT.md "Now" section, and injects them as `additionalContext` for the model. Claude then *automatically knows* which task you're on, what was decided, and what to do next — without you typing a word.
+
+Add to `~/.claude/settings.json` (merging with the SessionEnd hook above):
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/claude-task-templates/bin/claude-task-context",
+            "shell": "bash",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Cost: ~250–400 tokens injected per prompt, capped at ~1.5 KB. Silent no-op when no `.claude-task/` is in scope, so safe to enable globally.
+
+Pair with a global `~/.claude/CLAUDE.md` that tells Claude how to *act* on the injected context — see `snippets/CLAUDE.md.user-snippet` in this repo for a ready-to-use behavior contract covering: takeover on first prompt, checkpoint at natural pauses, scaffold-on-substantial-work, archive on done.
+
 ## Orchestrator API
 
 The YAML frontmatter in `<slug>/STATUS.md` is the contract. Read it from any language:

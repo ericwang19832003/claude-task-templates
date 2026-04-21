@@ -1,0 +1,87 @@
+# Working memory protocol (claude-task-templates)
+
+This machine has the `claude-task-templates` system installed. A `UserPromptSubmit`
+hook injects task context on every prompt when an active task exists in the current
+repo's `.claude-task/`. Treat that injected block as authoritative — it tells you
+exactly which task you're on and what to do next.
+
+## On first prompt of a session, when injected context shows an active task
+
+Before doing anything else, perform a **takeover**:
+
+1. Read `.claude-task/<slug>/STATUS.md` (full file, not just the injected excerpt).
+2. Read `.claude-task/<slug>/BRIEF.md`.
+3. Read `.claude-task/<slug>/NEXT.md`.
+4. Skim the newest 5–10 entries of `.claude-task/<slug>/DECISIONS.md`.
+5. Update STATUS.md frontmatter: set `owner` to your model name, set `session_id`
+   to the current Claude session UUID if known (else leave it), bump `updated`
+   to the current UTC timestamp.
+
+Only open `LOG.md` if STATUS/BRIEF/NEXT/DECISIONS leave you confused.
+
+After the takeover, proceed with the user's prompt. The takeover should take under
+five minutes and runs implicitly — don't narrate it unless the user asks.
+
+## During work — checkpoint at every natural pause
+
+A natural pause is: finishing a phase, hitting a blocker, switching focus, before
+running a long-running task, or when you sense you've accumulated meaningful state
+since the last checkpoint. Don't wait for the user to ask.
+
+A checkpoint is:
+
+1. Rewrite the "Where we are" paragraph in `STATUS.md` (≤80 words) and bump
+   `updated`. Update `status`, `blockers_open`, `next_action_owner` if they changed.
+2. Overwrite `NEXT.md` with the literal next 1–3 things to do — specific enough
+   that an arriving agent can start without thinking. Include file paths, commands,
+   commit hashes.
+3. Append an entry to `LOG.md` (newest at top): `## YYYY-MM-DD HH:MM · headline`
+   followed by 1–3 sentences citing commits/PRs/files.
+4. If a new irreversible choice was made: append to `DECISIONS.md` with a Why-line.
+5. If a new artifact was produced (commit, PR, file, URL): append to `ARTIFACTS.md`.
+
+Target: ≤2 minutes per checkpoint. Cheaper than reconstructing context after a reset.
+
+## When the user describes substantial new work and there is no active task
+
+If the user describes a piece of work expected to span more than one session,
+or that produces decisions worth preserving, **scaffold a task automatically**:
+
+1. Pick a slug (lowercase-kebab from the title, ≤60 chars).
+2. Run `claude-task-init <slug> --title "<title>"` (it's on `$PATH` from
+   `~/claude-task-templates/bin/`). If `$PATH` doesn't have it, call by absolute
+   path `~/claude-task-templates/bin/claude-task-init`.
+3. Populate `BRIEF.md` from the conversation context (goal, scope, success
+   criteria, constraints, source spec link if any).
+4. Write the first `NEXT.md` with a concrete first step.
+5. Set `STATUS.md` `status: in_progress` and bump `updated`.
+6. Confirm to the user: "Scaffolded task `<slug>`. BRIEF and NEXT filled in.
+   Starting on …".
+
+Skip this for trivial one-shot work (typo fixes, quick questions). The threshold
+is "spans more than one session OR produces non-trivial decisions worth preserving."
+
+## When status flips to done or abandoned
+
+1. Final checkpoint (success-criteria check-off, last LOG entry).
+2. `mv .claude-task/<slug> .claude-task/_archive/<slug>`
+3. Truncate `.claude-task/ACTIVE` (or set it to the next task the user wants).
+
+## When LOG.md exceeds 500 lines
+
+Run a fold during the next checkpoint:
+
+1. Identify the 200 oldest entries (bottom of file).
+2. Write a `## Summarized through <date>` block at the top: 5–15 bullets, one per
+   major arc, preserving commit hashes / PR numbers / key file paths.
+3. Delete the 200 original entries that were folded.
+
+## Never
+
+- Edit `BRIEF.md` after init. Scope changes go in `DECISIONS.md` instead.
+- Skip checkpoints to save time — that's the failure mode this whole system exists
+  to prevent.
+- Create a task folder for trivial one-shot work.
+- Store secrets in any of these files (plaintext on disk).
+- Use the auto-memory system (`~/.claude/projects/.../memory/`) for per-task state.
+  Per-task state belongs in `.claude-task/`. Auto-memory is for slow-moving facts.

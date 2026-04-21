@@ -24,29 +24,25 @@ After install, every Claude Code session on your machine:
 
 ---
 
-## Optional: project-specific task memory
+## Project-specific memory (automatic)
 
-For work spanning many sessions that deserves its own log, decisions, and artifacts — run this inside any repo:
+When you start a substantial piece of work inside a repo, Claude automatically creates a dedicated memory folder for it — no commands needed. Just describe what you're building and Claude scaffolds it.
 
-```bash
-claude-task-init my-task --title "Implement payment retry logic"
-```
-
-Claude will automatically populate and maintain the task files. Project-specific memory takes priority over global memory when you're inside that repo.
-
-This creates:
+The folder looks like this:
 
 ```
 your-repo/
   .claude-task/
     my-task/
-      STATUS.md     — current state (auto-updated by Claude)
+      STATUS.md     — current state (kept up to date by Claude)
       BRIEF.md      — goal, scope, success criteria
-      NEXT.md       — next 1–3 concrete steps (auto-updated)
+      NEXT.md       — next 1–3 concrete steps
       DECISIONS.md  — irreversible choices + rationale
-      LOG.md        — append-only session journal
-      ARTIFACTS.md  — commits, PRs, files, URLs produced
+      LOG.md        — session journal
+      ARTIFACTS.md  — commits, PRs, files produced
 ```
+
+Project memory takes priority over global memory when you're inside that repo, so Claude always knows the full context of the work in progress.
 
 ---
 

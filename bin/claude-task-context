@@ -23,6 +23,15 @@ while [ "$DIR" != "/" ] && [ "$DIR" != "" ]; do
 done
 # Fall back to global task store (~/.claude-task/) if no repo-local one found.
 if [ ! -d "$DIR/.claude-task" ]; then
+  # Auto-create global task if missing (self-heal).
+  if [ ! -d "$HOME/.claude-task" ] || [ ! -f "$HOME/.claude-task/ACTIVE" ]; then
+    INIT_BIN="$(cd "$(dirname "$0")" 2>/dev/null && pwd)/claude-task-init"
+    if [ -x "$INIT_BIN" ]; then
+      "$INIT_BIN" general --title "Global session memory" --global >/dev/null 2>&1 || true
+    else
+      exit 0
+    fi
+  fi
   [ -d "$HOME/.claude-task" ] || exit 0
   DIR="$HOME"
 fi

@@ -21,7 +21,11 @@ while [ "$DIR" != "/" ] && [ "$DIR" != "" ]; do
   [ -d "$DIR/.claude-task" ] && break
   DIR="$(dirname "$DIR")"
 done
-[ -d "$DIR/.claude-task" ] || exit 0    # silent: no .claude-task in scope
+# Fall back to global task store (~/.claude-task/) if no repo-local one found.
+if [ ! -d "$DIR/.claude-task" ]; then
+  [ -d "$HOME/.claude-task" ] || exit 0
+  DIR="$HOME"
+fi
 
 ACTIVE_FILE="$DIR/.claude-task/ACTIVE"
 [ -f "$ACTIVE_FILE" ] || exit 0

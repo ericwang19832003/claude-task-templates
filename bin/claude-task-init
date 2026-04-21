@@ -3,10 +3,13 @@ set -euo pipefail
 
 usage() {
   cat <<EOF
-Usage: claude-task-init <slug> --title "<title>" [--owner <name>] [--parent <slug>]
+Usage: claude-task-init <slug> --title "<title>" [--owner <name>] [--parent <slug>] [--global]
 
 Scaffolds .claude-task/<slug>/ in the current directory using templates from
 \$CLAUDE_TASK_TEMPLATES (default: ~/claude-task-templates).
+
+  --global   Create the task in ~/.claude-task/ instead of the current repo.
+             Enables cross-session memory everywhere, even outside any repo.
 
 If .claude-task/ does not exist yet, also drops README.md and updates .gitignore.
 Sets .claude-task/ACTIVE to <slug>.
@@ -16,12 +19,13 @@ EOF
 
 [ $# -ge 1 ] || usage
 SLUG="$1"; shift
-TITLE=""; OWNER="${USER:-unassigned}"; PARENT="null"
+TITLE=""; OWNER="${USER:-unassigned}"; PARENT="null"; GLOBAL=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --title)  TITLE="$2"; shift 2;;
     --owner)  OWNER="$2"; shift 2;;
     --parent) PARENT="$2"; shift 2;;
+    --global) GLOBAL=1; shift;;
     -h|--help) usage;;
     *) echo "Unknown arg: $1"; usage;;
   esac
@@ -36,7 +40,11 @@ esac
 TEMPL="${CLAUDE_TASK_TEMPLATES:-$HOME/claude-task-templates}"
 [ -d "$TEMPL/templates/task" ] || { echo "Error: templates not found at $TEMPL/templates/task"; exit 3; }
 
-DIR=".claude-task"
+if [ "$GLOBAL" -eq 1 ]; then
+  DIR="$HOME/.claude-task"
+else
+  DIR=".claude-task"
+fi
 TASK_DIR="$DIR/$SLUG"
 [ -e "$TASK_DIR" ] && { echo "Error: $TASK_DIR already exists"; exit 4; }
 
@@ -44,16 +52,19 @@ NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 DATE="$(date -u +%Y-%m-%d)"
 TIME="$(date -u +%H:%M)"
 
-# Bootstrap .claude-task/ if missing
+# Bootstrap the task store if missing
 if [ ! -d "$DIR" ]; then
   mkdir -p "$DIR"
-  cp "$TEMPL/templates/README.md.tmpl" "$DIR/README.md"
-  if [ -f .gitignore ]; then
-    if ! grep -qxF '.claude-task/*' .gitignore; then
-      printf '\n%s' "$(cat "$TEMPL/snippets/gitignore.snippet")" >> .gitignore
+  if [ "$GLOBAL" -eq 0 ]; then
+    # Repo-local: add README + gitignore entry
+    cp "$TEMPL/templates/README.md.tmpl" "$DIR/README.md"
+    if [ -f .gitignore ]; then
+      if ! grep -qxF '.claude-task/*' .gitignore; then
+        printf '\n%s' "$(cat "$TEMPL/snippets/gitignore.snippet")" >> .gitignore
+      fi
+    else
+      cp "$TEMPL/snippets/gitignore.snippet" .gitignore
     fi
-  else
-    cp "$TEMPL/snippets/gitignore.snippet" .gitignore
   fi
 fi
 

@@ -96,7 +96,7 @@ def cap(s, n):
     return s if len(s) <= n else s[:n - 3].rstrip() + "..."
 
 lines = [
-    "[claude-task-templates: active task context]",
+    "[claude-memory: active task context]",
     f"Task: {slug} — {fm.get('title', '(untitled)')}",
     f"Status: {fm.get('status', '?')} · Owner: {fm.get('owner', '?')} · "
         f"Updated: {fm.get('updated', '?')}",

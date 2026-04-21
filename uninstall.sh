@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# claude-task-templates uninstaller.
+# claude-memory uninstaller.
 # Reverses everything install.sh did — safe to run even if install was partial.
 # Does NOT delete .claude-task/ folders inside your repos.
 
 set -euo pipefail
 
-INSTALL_DIR="${CTT_INSTALL_DIR:-$HOME/claude-task-templates}"
+INSTALL_DIR="${CTT_INSTALL_DIR:-$HOME/claude-memory}"
 CLAUDE_DIR="$HOME/.claude"
 SETTINGS_FILE="$CLAUDE_DIR/settings.json"
 GLOBAL_CLAUDE_MD="$CLAUDE_DIR/CLAUDE.md"
-MARKER="<!-- claude-task-templates: managed block — do not edit between markers -->"
-END_MARKER="<!-- /claude-task-templates -->"
+MARKER="<!-- claude-memory: managed block — do not edit between markers -->"
+END_MARKER="<!-- /claude-memory -->"
 
 step() { printf "\033[1;36m▸\033[0m %s\n" "$1"; }
 ok()   { printf "\033[1;32m✓\033[0m %s\n" "$1"; }
@@ -28,8 +28,8 @@ import sys, pathlib
 
 p = pathlib.Path(sys.argv[1])
 text = p.read_text(encoding="utf-8")
-START = "<!-- claude-task-templates: managed block — do not edit between markers -->"
-END   = "<!-- /claude-task-templates -->"
+START = "<!-- claude-memory: managed block — do not edit between markers -->"
+END   = "<!-- /claude-memory -->"
 start_idx = text.find(START)
 end_idx   = text.find(END, start_idx)
 if start_idx == -1 or end_idx == -1:
@@ -106,9 +106,9 @@ fi
 # 3. Remove PATH line from shell rc files
 step "Removing PATH line from shell rc files"
 for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
-  if [ -f "$rc" ] && grep -qF 'claude-task-templates' "$rc"; then
+  if [ -f "$rc" ] && grep -qF 'claude-memory' "$rc"; then
     # Remove the comment + export line (both lines)
-    grep -v 'claude-task-templates' "$rc" > "$rc.ctt-tmp" && mv "$rc.ctt-tmp" "$rc"
+    grep -v 'claude-memory' "$rc" > "$rc.ctt-tmp" && mv "$rc.ctt-tmp" "$rc"
     ok "Removed from $rc"
   else
     [ -f "$rc" ] && ok "$rc — no entry found"

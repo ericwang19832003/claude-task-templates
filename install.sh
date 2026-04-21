@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# claude-task-templates one-line installer.
+# claude-memory one-line installer.
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/ericwang19832003/claude-task-templates/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/ericwang19832003/claude-memory/main/install.sh | bash
 #
 # Idempotent: safe to re-run. Updates the local repo, adds PATH on first run,
 # merges global CLAUDE.md and ~/.claude/settings.json hooks without clobbering
@@ -9,13 +9,13 @@
 
 set -euo pipefail
 
-REPO_URL="${CTT_REPO_URL:-https://github.com/ericwang19832003/claude-task-templates.git}"
-INSTALL_DIR="${CTT_INSTALL_DIR:-$HOME/claude-task-templates}"
+REPO_URL="${CTT_REPO_URL:-https://github.com/ericwang19832003/claude-memory.git}"
+INSTALL_DIR="${CTT_INSTALL_DIR:-$HOME/claude-memory}"
 CLAUDE_DIR="$HOME/.claude"
 SETTINGS_FILE="$CLAUDE_DIR/settings.json"
 GLOBAL_CLAUDE_MD="$CLAUDE_DIR/CLAUDE.md"
-MARKER="<!-- claude-task-templates: managed block — do not edit between markers -->"
-END_MARKER="<!-- /claude-task-templates -->"
+MARKER="<!-- claude-memory: managed block — do not edit between markers -->"
+END_MARKER="<!-- /claude-memory -->"
 
 step() { printf "\033[1;36m▸\033[0m %s\n" "$1"; }
 ok()   { printf "\033[1;32m✓\033[0m %s\n" "$1"; }
@@ -49,14 +49,14 @@ ok "Repo ready at $INSTALL_DIR"
 
 # 3. Add bin/ to PATH in shell rc files (idempotent)
 step "Wiring PATH"
-PATH_LINE='export PATH="$HOME/claude-task-templates/bin:$PATH"  # claude-task-templates'
+PATH_LINE='export PATH="$HOME/claude-memory/bin:$PATH"  # claude-memory'
 for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
   if [ -f "$rc" ]; then
-    if ! grep -qF 'claude-task-templates' "$rc"; then
-      printf '\n# claude-task-templates\n%s\n' "$PATH_LINE" >> "$rc"
+    if ! grep -qF 'claude-memory' "$rc"; then
+      printf '\n# claude-memory\n%s\n' "$PATH_LINE" >> "$rc"
       ok "Appended to $rc"
     else
-      ok "$rc already references claude-task-templates"
+      ok "$rc already references claude-memory"
     fi
   fi
 done
@@ -92,8 +92,8 @@ import json, os, sys, pathlib
 p = pathlib.Path(sys.argv[1])
 home = os.path.expanduser("~").replace("\\", "/")
 # Use absolute paths so the hook resolves regardless of cwd / shell.
-checkpoint = f"{home}/claude-task-templates/bin/claude-task-checkpoint --source hook"
-context    = f"{home}/claude-task-templates/bin/claude-task-context"
+checkpoint = f"{home}/claude-memory/bin/claude-task-checkpoint --source hook"
+context    = f"{home}/claude-memory/bin/claude-task-context"
 
 CHECKPOINT_HOOK = {
     "hooks": [
@@ -177,4 +177,4 @@ echo "  mkdir /tmp/cttest && cd /tmp/cttest"
 echo "  claude-task-init demo --title 'Demo'"
 echo "  echo '{}' | claude-task-context | python3 -m json.tool"
 echo
-echo "Read more: https://github.com/ericwang19832003/claude-task-templates"
+echo "Read more: https://github.com/ericwang19832003/claude-memory"

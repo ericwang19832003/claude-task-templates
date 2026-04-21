@@ -1,11 +1,11 @@
-# claude-task-templates
+# claude-memory
 
 Cross-session memory for Claude Code. Install once — Claude remembers context across every session, automatically.
 
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ericwang19832003/claude-task-templates/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ericwang19832003/claude-memory/main/install.sh | bash
 ```
 
 Then open a new shell, and inside Claude Code type `/hooks` once and dismiss it.
@@ -49,7 +49,7 @@ Project memory takes priority over global memory when you're inside that repo, s
 ## Uninstall
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ericwang19832003/claude-task-templates/main/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ericwang19832003/claude-memory/main/uninstall.sh | bash
 ```
 
 ---
@@ -59,7 +59,7 @@ curl -fsSL https://raw.githubusercontent.com/ericwang19832003/claude-task-templa
 If collaborators don't have the system installed, add this to your repo's `CLAUDE.md` so they still get basic context when they clone:
 
 ```bash
-cat ~/claude-task-templates/snippets/CLAUDE.md.snippet >> CLAUDE.md
+cat ~/claude-memory/snippets/CLAUDE.md.snippet >> CLAUDE.md
 ```
 
 ---

@@ -6,7 +6,7 @@ usage() {
 Usage: claude-task-init <slug> --title "<title>" [--owner <name>] [--parent <slug>] [--global]
 
 Scaffolds .claude-task/<slug>/ in the current directory using templates from
-\$CLAUDE_TASK_TEMPLATES (default: ~/claude-task-templates).
+\$CLAUDE_TASK_TEMPLATES (default: ~/claude-memory).
 
   --global   Create the task in ~/.claude-task/ instead of the current repo.
              Enables cross-session memory everywhere, even outside any repo.
@@ -37,7 +37,7 @@ case "$SLUG" in
   *[!a-z0-9-]*|"") echo "Error: slug must be lowercase-kebab (a-z, 0-9, -)"; exit 2;;
 esac
 
-TEMPL="${CLAUDE_TASK_TEMPLATES:-$HOME/claude-task-templates}"
+TEMPL="${CLAUDE_TASK_TEMPLATES:-$HOME/claude-memory}"
 [ -d "$TEMPL/templates/task" ] || { echo "Error: templates not found at $TEMPL/templates/task"; exit 3; }
 
 if [ "$GLOBAL" -eq 1 ]; then

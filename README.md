@@ -1,16 +1,19 @@
 # claude-task-templates
 
-A repo-local memory layer for long-running Claude Code sessions and multi-session
-orchestration. One folder per task in `.claude-task/<slug>/`, six fixed files,
-YAML frontmatter as the orchestrator contract.
+Cross-session memory for Claude Code — automatic from the moment you install.
+No commands needed. Claude remembers context across sessions everywhere on your machine.
+
+For long-running or repo-specific work, one folder per task in `.claude-task/<slug>/`,
+six fixed files, YAML frontmatter as the orchestrator contract.
 
 **Goals:**
 
-1. A session can be reset (or `/clear`-ed) at any time without losing important state.
-2. Context doesn't grow unboundedly and degrade model performance.
-3. A brand-new agent can take over a task within **5 minutes** by reading the memory files.
-4. An orchestrator (script, scheduled trigger, dashboard) can read task status programmatically.
-5. Repeated work and back-and-forth across sessions is reduced.
+1. Memory is active the moment you install — zero extra commands required.
+2. A session can be reset (or `/clear`-ed) at any time without losing important state.
+3. Context doesn't grow unboundedly and degrade model performance.
+4. A brand-new agent can take over a task within **5 minutes** by reading the memory files.
+5. An orchestrator (script, scheduled trigger, dashboard) can read task status programmatically.
+6. Repeated work and back-and-forth across sessions is reduced.
 
 **Spec:** [`docs/specs/2026-04-20-design.md`](docs/specs/2026-04-20-design.md)
 **Implementation plan:** [`docs/specs/2026-04-20-plan.md`](docs/specs/2026-04-20-plan.md)
@@ -31,9 +34,10 @@ This installer:
 4. Merges two hooks into `~/.claude/settings.json`:
    - `SessionEnd` → auto-checkpoint on session end
    - `UserPromptSubmit` → inject active-task context on every prompt
-5. Refuses to clobber. Re-run any time to update.
+5. **Creates global task memory at `~/.claude-task/general/`** — active immediately, everywhere.
+6. Refuses to clobber. Re-run any time to update.
 
-After install, open a new shell, then inside Claude Code type `/hooks` once and dismiss it (this reloads the settings watcher and activates the hooks for the current session).
+After install, open a new shell, then inside Claude Code type `/hooks` once and dismiss it. **That's it — memory is on.**
 
 **Manual install (if you prefer to see what's happening):**
 
@@ -50,7 +54,15 @@ exec $SHELL
 
 ## Use
 
-In any repo where you want cross-session task memory:
+### Zero-setup (automatic)
+
+After install, **nothing to do.** Open Claude Code anywhere on your machine and memory is already active. Claude automatically picks up context from the previous session on every prompt.
+
+The global memory lives at `~/.claude-task/general/` and is self-healing — if it ever gets deleted, the hook recreates it silently on the next prompt.
+
+### Project-specific task memory (optional)
+
+For work that spans many sessions and deserves its own dedicated log, decisions, and artifacts:
 
 ```bash
 cd path/to/your-repo
@@ -73,6 +85,8 @@ your-repo/
       ARTIFACTS.md       (pointers to commits, PRs, files, URLs)
   .gitignore             (auto-appended; .claude-task/* with !.claude-task/README.md)
 ```
+
+Project-specific tasks take priority over the global memory. When you're inside a repo that has `.claude-task/`, that context is injected instead.
 
 Then:
 

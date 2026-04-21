@@ -23,13 +23,18 @@ warn() { printf "\033[1;33m!\033[0m %s\n" "$1"; }
 
 # 1. Verify prerequisites
 step "Checking prerequisites"
-for cmd in git python; do
+for cmd in git; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "Error: '$cmd' is required but not found in PATH." >&2
     exit 1
   fi
 done
-ok "git and python present"
+PYTHON=$(command -v python3 || command -v python || echo "")
+if [ -z "$PYTHON" ]; then
+  echo "Error: python3 (or python) is required but not found in PATH." >&2
+  exit 1
+fi
+ok "git and python present ($PYTHON)"
 
 # 2. Clone or update the repo
 if [ -d "$INSTALL_DIR/.git" ]; then
@@ -81,7 +86,7 @@ fi
 
 # 5. Merge hooks into ~/.claude/settings.json (using Python for safe JSON merge)
 step "Merging hooks into ~/.claude/settings.json"
-python - "$SETTINGS_FILE" <<'PY'
+$PYTHON - "$SETTINGS_FILE" <<'PY'
 import json, os, sys, pathlib
 
 p = pathlib.Path(sys.argv[1])
@@ -154,6 +159,6 @@ echo
 echo "Verify the install:"
 echo "  mkdir /tmp/cttest && cd /tmp/cttest"
 echo "  claude-task-init demo --title 'Demo'"
-echo "  echo '{}' | claude-task-context | python -m json.tool"
+echo "  echo '{}' | claude-task-context | python3 -m json.tool"
 echo
 echo "Read more: https://github.com/ericwang19832003/claude-task-templates"

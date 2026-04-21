@@ -145,7 +145,22 @@ PY
 
 ok "Hooks merged"
 
-# 6. Summary
+# 6. Bootstrap global task memory
+step "Bootstrapping global task memory"
+# Note: checks directory existence only; a partial init from a prior failed run
+# would require manual cleanup with: rm -rf ~/.claude-task/general
+export PATH="$INSTALL_DIR/bin:$PATH"
+if [ ! -d "$HOME/.claude-task/general" ]; then
+  if "$INSTALL_DIR/bin/claude-task-init" general --title "Global session memory" --global; then
+    ok "Global task memory ready at ~/.claude-task/general/"
+  else
+    warn "Could not create global task memory — run manually: claude-task-init general --title 'Global session memory' --global"
+  fi
+else
+  ok "Global task memory already exists at ~/.claude-task/general/"
+fi
+
+# 7. Summary
 echo
 printf "\033[1;32m✓ Installation complete.\033[0m\n"
 echo
@@ -153,8 +168,9 @@ echo "Next steps:"
 echo "  1. Open a new shell (or run 'exec \$SHELL') so the new PATH takes effect."
 echo "  2. Inside Claude Code, type /hooks once and dismiss it — that reloads the"
 echo "     settings watcher and activates both hooks for the current session."
-echo "  3. In any repo, run 'claude-task-init <slug> --title \"...\"' to scaffold"
-echo "     the first task. Then ask Claude to fill out BRIEF / NEXT / STATUS."
+echo "  3. Global memory is active. Claude Code will remember context across sessions"
+echo "     automatically. Run 'claude-task-init <slug> --title \"...\"' inside a repo"
+echo "     to create project-specific task memory."
 echo
 echo "Verify the install:"
 echo "  mkdir /tmp/cttest && cd /tmp/cttest"

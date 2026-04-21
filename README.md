@@ -17,13 +17,36 @@ YAML frontmatter as the orchestrator contract.
 
 ## Install
 
+**One-line install (recommended).** Works on macOS, Linux, and Windows (Git Bash):
+
 ```bash
-git clone https://github.com/<you>/claude-task-templates.git ~/claude-task-templates
+curl -fsSL https://raw.githubusercontent.com/ericwang19832003/claude-task-templates/main/install.sh | bash
+```
+
+This installer:
+
+1. Clones the repo to `~/claude-task-templates` (or pulls if it already exists).
+2. Adds `bin/` to your `PATH` via `~/.bashrc` and `~/.zshrc` (if either exists).
+3. Appends a global behavior contract to `~/.claude/CLAUDE.md` (so every Claude session knows the protocol).
+4. Merges two hooks into `~/.claude/settings.json`:
+   - `SessionEnd` → auto-checkpoint on session end
+   - `UserPromptSubmit` → inject active-task context on every prompt
+5. Refuses to clobber. Re-run any time to update.
+
+After install, open a new shell, then inside Claude Code type `/hooks` once and dismiss it (this reloads the settings watcher and activates the hooks for the current session).
+
+**Manual install (if you prefer to see what's happening):**
+
+```bash
+git clone https://github.com/ericwang19832003/claude-task-templates.git ~/claude-task-templates
 echo 'export PATH="$HOME/claude-task-templates/bin:$PATH"' >> ~/.bashrc
+cp ~/claude-task-templates/snippets/CLAUDE.md.user-snippet ~/.claude/CLAUDE.md
+# Then merge the SessionEnd + UserPromptSubmit hooks into ~/.claude/settings.json
+# (see the "Auto-checkpoint" and "Auto-context injection" sections below)
 exec $SHELL
 ```
 
-(On Windows under Git Bash, use the same lines — `~/.bashrc` is the Git Bash startup file.)
+(Windows users: the same lines work in Git Bash.)
 
 ## Use
 

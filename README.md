@@ -96,11 +96,13 @@ Then:
 4. **Checkpoint** at every natural pause: rewrite `STATUS.md` and `NEXT.md`, append to `LOG.md`. ~2 min.
 5. **Takeover** in any new session: `cat .claude-task/ACTIVE`, then read `STATUS.md` → `BRIEF.md` → `NEXT.md`. ~5 min.
 
-Add this snippet to your repo's `CLAUDE.md` so every Claude Code session sees it at startup:
+**For collaborators who don't have the system installed:** add this minimal snippet to your repo's `CLAUDE.md` so they still get basic takeover instructions when they clone:
 
 ```bash
 cat ~/claude-task-templates/snippets/CLAUDE.md.snippet >> CLAUDE.md
 ```
+
+If everyone on your team has run the installer, you don't need this — the global `~/.claude/CLAUDE.md` already covers it.
 
 ## Auto-checkpoint via SessionEnd hook (optional but recommended)
 
